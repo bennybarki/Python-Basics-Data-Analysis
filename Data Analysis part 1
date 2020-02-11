@@ -1,0 +1,121 @@
+import pandas as pd
+import numpy as np
+
+
+def get_total_rows(df):
+
+    return df.shape[0]
+
+    pass
+
+def get_sorted_columns(df):
+
+    df_sorted = df.sort_index(axis=1, ascending=True)
+    return list(df_sorted.columns)
+    pass
+
+def count_unique_values(df):
+
+
+    sr = df.apply(pd.Series.nunique)
+    return sr
+    pass
+
+def get_index_as_list(df, column_index):
+
+    if(column_index == True):
+        return list(df.axes[1])
+    else:
+        return list(df.axes[0])
+    pass
+
+def find_min_year(df):
+
+    return df.Year.min()
+    pass
+
+def apply_fun_over_numric_columns(df, columns, fun):
+
+    ls_fun = [np.prod, np.std, np.var, np.sum, np.min,np.max,np.mean,np.median]
+
+    for col in columns:
+        if col not in df.columns:
+            raise ValueError("The specified column is missing from the dataframe")
+        # to check if the dtype is a sub dtype
+        elif fun not in ls_fun:
+            raise ValueError("Invalid function! function must be one of np.prod, np.std, np.var, np.sum, np.min,np.max, np.mean, np.median")
+        elif np.issubdtype(df[col].dtype, np.number) == False:
+            raise ValueError("The specified column must be numeric")
+
+
+    # Use .apply to send a column of every row to a function
+    sr = df[columns].apply(fun)
+
+    return sr
+
+    pass
+
+
+def reshapeDataFrame(df1, df2, st):
+
+    df1 = df1.drop(labels=['Element'], axis=1)
+    df2 = df2.drop(labels=['Element'], axis=1)
+    df_merged = pd.merge(df1, df2, on=['Area', 'Item', 'Year'], how='inner')
+    df_merged = df_merged.rename(columns={"Value_x": "Quantity(tons)", "Value_y": "Price(k,usd)"})
+    df_merged['Element'] = st
+    # df_merged.insert(2, 'Element', st, True) insert col to specific place
+
+    return df_merged
+
+
+def reshape(df):
+    df = df.drop(['Unit'], axis=1)
+    gb = df.groupby('Element')
+    g = [gb.get_group(x) for x in gb.groups]
+
+    df_import = reshapeDataFrame(g[2], g[3], "Import")
+    df_export = reshapeDataFrame(g[0], g[1], "Export")
+
+    return pd.concat([df_import, df_export])
+
+
+
+def validate(df):
+
+    assert(df.shape == (5128759, 6))
+    assert(pd.Series(df.columns == pd.Index(['Area', 'Item', 'Year', 'Quantity(tons)', 'Price(k,usd)', 'Element'],
+                                      dtype='object')).all())
+    pass
+
+
+if __name__ == '__main__':
+
+    # PART A
+    df = pd.read_pickle('data.pickle')  ## 'data_projected.pickle'
+
+    # A. 1
+    total_rows = get_total_rows(df)
+    # A. 2
+    columns_sorted = get_sorted_columns(df)
+    # A. 3
+    columns_sums_ = count_unique_values(df)
+    # A. 4
+    res1 = get_index_as_list(df, True)
+    res2 = get_index_as_list(df, False)
+
+    # A. 5
+    year = find_min_year(df)
+    # A. 6
+    columns = ["Value", "Year"]
+    year_value_means = apply_fun_over_numric_columns(df, columns, np.mean)
+    print('A6a', year_value_means)
+
+    columns = ["Year"]
+    max_val = apply_fun_over_numric_columns(df, columns, np.max)
+    print('A6b', max_val)
+
+    # PART B
+
+    df_r = reshape(df)
+    validate(df_r)
+    pd.to_pickle(df_r, "fixed_df.pickle")

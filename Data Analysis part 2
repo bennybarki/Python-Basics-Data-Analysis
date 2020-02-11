@@ -1,0 +1,123 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+
+
+# C.1
+
+def find_most_frequent_year(df, n):
+    if isinstance(n, int) == False or n <= 0:
+        raise ValueError("n must be a strictly positive integer (>0)")
+
+    # value_counts Return a Series containing counts of unique values.
+
+    return (df['Year'].value_counts(sort=True, ascending=False)).keys()[n - 1]
+
+    pass
+
+
+# C.2
+
+def filterby_criteria(df, criteria):
+    k = list(criteria.keys())
+    if set(k).issubset(df.columns) == False:
+        for i in k:
+            if (i in df.columns) == False:
+                raise ValueError(f"{i} is not a column in df")
+
+    df_f = df.copy()
+    for i in k:
+        df_f = df_f[df_f[i].isin(criteria[i])]
+    return df_f
+
+    pass
+
+
+# C.3
+
+def find_extremes(df, fun=np.sum, by_item=True, by_value=True, n=5):
+    if isinstance(n, int) == False or n == 0:
+        raise ValueError("n must be an integer different than zero")
+    if fun not in [np.prod, np.std, np.var, np.sum, np.min, np.max, np.mean, np.median]:
+        raise ValueError(
+            'Invalid function! function must be one of np.prod(),np.std(),np.var(),np.sum(), np.min(), np.max(), np.mean(), np.midian()')
+    if df['Element'].str.contains('Import').any() and df['Element'].str.contains('Export').any():
+        raise ValueError('The dataframe must only include Import or Export rows')
+
+    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+    if by_item:
+        df_grouped = df.groupby('Item')
+    else:
+        df_grouped = df.groupby('Area')
+    if by_value:
+        grp = df_grouped['Price(k,usd)'].apply(fun)
+    else:
+        grp = df_grouped['Quantity(tons)'].apply(fun)
+    grp = grp.sort_values(ascending=False)
+    if n < 0:
+        return grp.index[:abs(n)].tolist()
+    else:
+        return grp.index[-n:].tolist()
+
+
+# C.4
+
+def generate_scatter_import_vs_export(df, countries, year, output):
+    for con in countries:
+        exp_v = (filterby_criteria(df, {"Element": ["Export"], "Year": [year], "Area": [con]}))['Quantity(tons)'].sum()
+        impo_v = (filterby_criteria(df, {"Element": ["Import"], "Year": [year], "Area": [con]}))['Quantity(tons)'].sum()
+        x = impo_v
+        y = exp_v
+        ratio = exp_v / impo_v
+        if (ratio > 1):
+            co = 'g'
+        else:
+            co = 'r'
+        plt.scatter(x, y, c=co, s=ratio * 30)
+        plt.annotate(con, (x, y))
+
+    plt.title('Exports as function of imports')
+    plt.xlabel('Import')
+    plt.ylabel('Export')
+    plt.savefig(output)
+    #     plt.show()
+
+    pass
+
+
+if __name__ == '__main__':
+    LN_SEP = "\n---------------------------------------------"
+
+    df = pd.read_pickle("fixed_df.pickle")
+    # PART C
+    # C. 1
+    year1 = find_most_frequent_year(df, 1)
+    year2 = find_most_frequent_year(df, 4)
+    print('year1, year2:', year1, year2)
+
+    # PART C
+    # C. 2
+    df_isr75_export = filterby_criteria(df, {"Area": ["Israel"], "Year": [1975], "Element": ["Export"]})
+    df_isr13_export = filterby_criteria(df, {"Area": ["Israel"], "Year": [2013], "Element": ["Export"]})
+
+    # PART C
+    # C. 3
+    most_items = find_extremes(df_isr75_export, by_item=True, by_value=True, n=-5)
+    print("most exported items from israel 2013 by value:\n", "\n".join(most_items), LN_SEP)
+    most_items = find_extremes(df_isr13_export, by_item=True, by_value=False, n=-5)
+    print("most exported items from israel 2013 by quantity:\n", "\n".join(most_items), LN_SEP)
+
+    df_exp = filterby_criteria(df, {"Element": ["Export"], "Year": [2013]})
+    df_imp = filterby_criteria(df, {"Element": ["Import"], "Year": [2013]})
+
+    most_exp_countries = find_extremes(df_exp, by_item=False, by_value=True, n=-12)
+    most_imp_countries = find_extremes(df_imp, by_item=False, by_value=True, n=-12)
+    countries = list(set(most_exp_countries + most_imp_countries))
+
+    print("List of countries that import and export the most by value:\n", "\n".join(countries), LN_SEP)
+    generate_scatter_import_vs_export(df, countries=countries, year=2013, output='import_vs_export')
+
+
+
+
